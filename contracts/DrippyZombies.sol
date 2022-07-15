@@ -1288,21 +1288,13 @@ contract DrippyZombies is ERC721, Ownable {
 
     string public baseURI = "";
     string public uriSuffix = ".json";
-
-    uint256 public preSaleCost = 0.04 ether;
-    uint256 public publicSaleCost = 0.08 ether;
+    
     uint256 public maxSupply = 8000;
-    uint256 public maxMintAmountPerTx = 1;
-    uint256 public maxMintAmountPreSalePerAddress = 4; // Presale
-    uint256 public maxMintAmountPublicPerAddress = 6; // public sale
-    uint32 preSaleStartTime;
-    uint32 publicSaleStartTime;
-
+   
     bool public paused = true;
     bool public revealed = false;
     string public notRevealedUri;
 
-    address[] private whitelistedAddresses;
 
     constructor(
         string memory _name,
@@ -1315,22 +1307,7 @@ contract DrippyZombies is ERC721, Ownable {
         setNotRevealedURI(_initNotRevealedUri);
     }
 
-    modifier mintCompliance(uint256 _mintAmount) {
-        require(
-            _mintAmount > 0 && _mintAmount < maxMintAmountPerTx + 1,
-            "Invalid mint amount!"
-        );
-        require(
-            supply.current() + _mintAmount < maxSupply + 1,
-            "Max supply exceeded!"
-        );
-        if (whitelistedAddresses.length > 0) {
-            require(isAddressWhitelisted(msg.sender), "Not on the whitelist!");
-        }
-        _;
-    }
-
-    function totalSupply() public view returns (uint256) {
+    function totalSupply() external view returns (uint256) {
         return supply.current();
     }
 
@@ -1338,92 +1315,18 @@ contract DrippyZombies is ERC721, Ownable {
         require(!paused, "The contract is paused!");
         _;
     }
-    modifier insufficientFunds(uint256 _tokenPrice, uint256 _mintAmount) {
-        require(msg.value >= _tokenPrice * _mintAmount, "Insufficient funds!");
-        _;
-    }
-    modifier saleStartTime(uint256 _startTime) {
-        uint256 _saleStartTime = uint256(_startTime);
-        // It can mint when the pre sale begins.
-        require(
-            _saleStartTime != 0 && block.timestamp >= _saleStartTime,
-            "sale has not started yet"
-        );
-        _;
-    }
 
-    modifier onWhiteList() {
-        require(isAddressWhitelisted(msg.sender), "Not on the whitelist!");
-        _;
-    }
-    modifier maxMintAmount(uint256 _mintAmount) {
-        require(
-            balanceOf(msg.sender) + _mintAmount <
-                maxMintAmountPreSalePerAddress + 1,
-            "Max mint per address exceeded!"
-        );
-        _;
-    }
-    modifier minMintAmount(uint256 _mintAmount) {
-         require(_mintAmount > 0, "Minimum mint per address exceeded!");
-        _;
-    }
-
-    function preSaleMint(uint256 _mintAmount)
-        external
-        payable
-        contractStatus
-        insufficientFunds(preSaleCost, _mintAmount)
-        saleStartTime(preSaleStartTime)
-        minMintAmount(_mintAmount)
-        maxMintAmount(_mintAmount)
-        onWhiteList
-    {
-        // change to transfer token ...
-        _mintLoop(msg.sender, _mintAmount);
-    }
-
-    function mint(uint256 _mintAmount)
-        public
-        payable
-        contractStatus
-        insufficientFunds(publicSaleCost, _mintAmount)
-        saleStartTime(publicSaleStartTime)
-        maxMintAmount(_mintAmount)
-        minMintAmount(_mintAmount)
-        mintCompliance(_mintAmount)
-    {
-        // change to transfer token ...
-        _mintLoop(msg.sender, _mintAmount);
-    }
-
-    function ownerMint(uint256 _mintAmount) public contractStatus onlyOwner {
+    function batchMint(uint256 _mintAmount) public contractStatus onlyOwner {
         _mintLoop(msg.sender, _mintAmount);
     }
 
     function mintForAddress(uint256 _mintAmount, address _receiver)
         public
-        mintCompliance(_mintAmount)
         onlyOwner
     {
         _mintLoop(_receiver, _mintAmount);
     }
 
-    function setWhitelist(address[] calldata _addressArray) public onlyOwner {
-        delete whitelistedAddresses;
-        whitelistedAddresses = _addressArray;
-    }
-
-    function isAddressWhitelisted(address _user) private view returns (bool) {
-        uint256 i = 0;
-        while (i < whitelistedAddresses.length) {
-            if (whitelistedAddresses[i] == _user) {
-                return true;
-            }
-            i++;
-        }
-        return false;
-    }
 
     function walletOfOwner(address _owner)
         public
@@ -1480,43 +1383,14 @@ contract DrippyZombies is ERC721, Ownable {
                 : "";
     }
 
-    //only owner
     function reveal() public onlyOwner {
         revealed = true;
-    }
-
-    function setPreSaleCost(uint256 _cost) public onlyOwner {
-        preSaleCost = _cost;
-    }
-
-    function setPublicSaleCost(uint256 _cost) public onlyOwner {
-        publicSaleCost = _cost;
     }
 
     function setMaxSupply(uint256 _maxSupply) public onlyOwner {
         maxSupply = _maxSupply;
     }
-
-    function setMaxMintAmountPerTx(uint256 _maxMintAmountPerTx)
-        public
-        onlyOwner
-    {
-        maxMintAmountPerTx = _maxMintAmountPerTx;
-    }
-
-    function setmaxMintAmountPreSalePerAddress(uint256 _newmaxMintAmount)
-        public
-        onlyOwner
-    {
-        maxMintAmountPreSalePerAddress = _newmaxMintAmount;
-    }
-
-    function setmaxMintAmountPublichSalePerAddress(uint256 _newmaxMintAmount)
-        public
-        onlyOwner
-    {
-        maxMintAmountPublicPerAddress = _newmaxMintAmount;
-    }
+  
 
     function setUriSuffix(string memory _uriSuffix) public onlyOwner {
         uriSuffix = _uriSuffix;
@@ -1533,6 +1407,15 @@ contract DrippyZombies is ERC721, Ownable {
     function setPaused(bool _state) public onlyOwner {
         paused = _state;
     }
+
+    function getStatus() external view returns (bool)  {
+        return paused;
+    }
+
+    function getMaxSupply() external view returns (uint256) {
+        return maxSupply;
+    }
+  
 
     function withdraw() public onlyOwner {
         // This will transfer the remaining contract balance to the owner.
@@ -1554,13 +1437,4 @@ contract DrippyZombies is ERC721, Ownable {
         return baseURI;
     }
 
-    // Decide when the presale starts
-    function setPreSaleStartTime(uint32 timestamp) external onlyOwner {
-        preSaleStartTime = timestamp;
-    }
-
-    // Decide when the public starts
-    function setPublicSaleStartTime(uint32 timestamp) external onlyOwner {
-        publicSaleStartTime = timestamp;
-    }
 }
