@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 
-interface IDrippyZombies {
-    function getStatus() external view returns (bool) ;
-    function totalSupply() external view returns (uint256);
+interface IDrippyZombies is IERC721Enumerable {
+    function getPaused() external view returns (bool) ;
     function getMaxSupply() external view returns (uint256);
 }
 
@@ -26,14 +23,13 @@ contract MarketPlace is ERC721Holder, Ownable {
     uint32 preSaleStartTime;
     uint32 publicSaleStartTime;
 
-    // event MarketItemCreated (
-    //     uint indexed itemId,
-    //     address indexed nftContract,
-    //     uint256 indexed tokenId,
-    //     address seller,
-    //     address owner,
-    //     uint256 price
-    // );
+    event BuyNFT (
+        uint256 indexed tokenId,
+        address indexed nftContract,
+        address seller,
+        address owner,
+        uint256 price
+    );
 
 
     constructor(address _nftContract) {
@@ -99,32 +95,28 @@ contract MarketPlace is ERC721Holder, Ownable {
         require(isAddressWhitelisted(msg.sender), "Not on the whitelist!");
         _;
     }
-    modifier maxMintAmount(uint256 _mintAmount) {
+    modifier maxMintAmount(uint256 _mintAmount, uint256 checkedValue) {
         require(
             IERC721(erc721).balanceOf(msg.sender) + _mintAmount <
-                maxMintAmountPreSalePerAddress + 1,
+                checkedValue + 1,
             "Max mint per address exceeded!"
         );
         _;
     }
-    modifier mintCompliance(uint256 _mintAmount) {
+
+    modifier mintPerTx(uint256 _mintAmount) {
         require(
-            _mintAmount > 0 && _mintAmount < maxMintAmountPerTx + 1,
+            _mintAmount < maxMintAmountPerTx + 1,
             "Invalid mint amount!"
         );
-        require(
-            IDrippyZombies(erc721).totalSupply() + _mintAmount < IDrippyZombies(erc721).getMaxSupply() + 1,
-            "Max supply exceeded!"
-        );
-        if (whitelistedAddresses.length > 0) {
-            require(isAddressWhitelisted(msg.sender), "Not on the whitelist!");
-        }
         _;
     }
+
     modifier insufficientFunds(uint256 _tokenPrice, uint256 _mintAmount) {
         require(msg.value >= _tokenPrice * _mintAmount, "Insufficient funds!");
         _;
     }
+
     modifier saleStartTime(uint256 _startTime) {
         uint256 _saleStartTime = uint256(_startTime);
         // It can mint when the pre sale begins.
@@ -135,26 +127,81 @@ contract MarketPlace is ERC721Holder, Ownable {
         _;
     }
 
-    modifier minMintAmount(uint256 _mintAmount) {
+    modifier minAmount(uint256 _mintAmount) {
          require(_mintAmount > 0, "Minimum mint per address exceeded!");
         _;
     }
     modifier activeContract() {
-        require(!IDrippyZombies(erc721).getStatus(), "The contract is paused!");
+        require(!getPaused(), "The contract is paused!");
         _;
     }
+  
    
-    function buyNFTPresale(uint256 _tokenId) external payable  activeContract insufficientFunds(preSaleCost, 1) saleStartTime(preSaleStartTime)   minMintAmount(1) maxMintAmount(1) onWhiteList {
+    function buyNFT(uint256 _tokenId) 
+        external 
+        payable  
+        activeContract 
+        insufficientFunds(publicSaleCost, 1) 
+        saleStartTime(publicSaleStartTime)   
+        minAmount(1) 
+    {
         getOwner().transfer(msg.value);
         IERC721(erc721).safeTransferFrom(address(this), msg.sender, _tokenId);
+        emit BuyNFT (
+            _tokenId,
+            erc721,
+            address(this),
+            msg.sender,
+            publicSaleCost
+        );
+    }
+     function transferOwnershipTokens(uint256 _amount) 
+        private 
+    {
+        uint256 ownerBalance = IERC721(erc721).balanceOf(address(this));
+        require(
+            ownerBalance > _amount,
+            "Max supply exceeded!"
+        );
+        for (uint256 i = 0; i < _amount; i++) {
+            uint256 tokenId = IDrippyZombies(erc721).tokenOfOwnerByIndex(address(this), 0);
+            IERC721(erc721).safeTransferFrom(address(this), msg.sender, tokenId);
+        }
+        getOwner().transfer(msg.value);
+    }
+
+     function buyNFTPublicSale(uint256 _amount) 
+        external 
+        payable  
+        activeContract 
+        insufficientFunds(publicSaleCost, _amount) 
+        saleStartTime(publicSaleStartTime)
+        minAmount(_amount) 
+        mintPerTx(_amount) 
+        maxMintAmount(_amount, maxMintAmountPublicPerAddress) 
+    {
+        transferOwnershipTokens(_amount);
+    }
+
+    function buyNFTPresale(uint256 _amount) 
+        external 
+        payable  
+        activeContract 
+        insufficientFunds(preSaleCost, _amount) 
+        saleStartTime(preSaleStartTime)   
+        minAmount(_amount) 
+        mintPerTx(_amount) 
+        maxMintAmount(_amount, maxMintAmountPreSalePerAddress) 
+        onWhiteList 
+    {
+        transferOwnershipTokens(_amount);
     }
 
     function getOwner() public view returns (address payable)  {
         return payable(owner());
     }
 
-    function getStatus() public view returns (bool)  {
-        return IDrippyZombies(erc721).getStatus();
+    function getPaused() public view returns (bool)  {
+        return IDrippyZombies(erc721).getPaused();
     }
-
 }
