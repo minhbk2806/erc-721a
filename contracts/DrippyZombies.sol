@@ -14,7 +14,7 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     
     uint256 public maxSupply = 8000;
    
-    bool public paused = true;
+    bool public paused = false;
     bool public revealed = false;
     string public notRevealedUri;
 
@@ -35,10 +35,16 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         _;
     }
 
+
+    /// @dev Function multi mint.
+    /// @param _mintAmount Number of amount NFTs owner want to mint.
     function batchMint(uint256 _mintAmount) public onlyOwner {
         _mintLoop(msg.sender, _mintAmount);
     }
-    // transfer  owner token to market contract after mint
+
+    /// @dev Function transfer owner token to market contract after mint.
+    /// @param _receiver Market contract that receive NFTs from owner.
+    /// @param _amount Number of amount NFTs owner want to transfer to Market contract.
     function batchTransfer(address _receiver, uint256 _amount)
         external
         onlyOwner
@@ -54,6 +60,9 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         }
     }
 
+    /// @dev Function multi mint from special address.
+    /// @param _receiver Address wallet that receive NFTs from owner.
+    /// @param _mintAmount Number of amount NFTs owner want to mint to _receiver.
     function mintForAddress(uint256 _mintAmount, address _receiver)
         public
         onlyOwner
@@ -61,8 +70,9 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         _mintLoop(_receiver, _mintAmount);
     }
 
-
-   function walletOfOwner(address _owner)
+    /// @dev Function check all current tokenId of the _owner address.
+    /// @param _owner Address wallet that want to get.
+    function walletOfOwner(address _owner)
         public
         view
         returns (uint256[] memory)
@@ -75,6 +85,8 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         return tokenIds;
     }
 
+    /// @dev Function return metadate uri of a token ID.
+    /// @param _tokenId token ID.
     function tokenURI(uint256 _tokenId)
         public
         view

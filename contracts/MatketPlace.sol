@@ -36,21 +36,27 @@ contract MarketPlace is ERC721Holder, Ownable {
         erc721 = _nftContract;
     }
 
-   
+    /// @dev Function set whitelist who can buy token in presale.
+    /// @param _addressArray Array of wallet address who will can buy token in presale.
     function setWhitelist(address[] calldata _addressArray) public onlyOwner {
         delete whitelistedAddresses;
         whitelistedAddresses = _addressArray;
     }
 
-    // Decide when the presale starts
+    /// @dev Function Decide when the presale starts
+    /// @param timestamp Timestamp start presale.
     function setPreSaleStartTime(uint32 timestamp) external onlyOwner {
         preSaleStartTime = timestamp;
     }
 
-    // Decide when the public starts
+    /// @dev Function Decide when the public starts
+    /// @param timestamp Timestamp start publicsale.
     function setPublicSaleStartTime(uint32 timestamp) external onlyOwner {
         publicSaleStartTime = timestamp;
     }
+
+    /// @dev Function set max mint amount per transaction
+    /// @param _maxMintAmountPerTx Max mint amount.
     function setMaxMintAmountPerTx(uint256 _maxMintAmountPerTx)
         public
         onlyOwner
@@ -58,6 +64,8 @@ contract MarketPlace is ERC721Holder, Ownable {
         maxMintAmountPerTx = _maxMintAmountPerTx;
     }
 
+    /// @dev Function set max mint amount in presale per address
+    /// @param _newmaxMintAmount Max mint amount.
     function setmaxMintAmountPreSalePerAddress(uint256 _newmaxMintAmount)
         public
         onlyOwner
@@ -65,6 +73,8 @@ contract MarketPlace is ERC721Holder, Ownable {
         maxMintAmountPreSalePerAddress = _newmaxMintAmount;
     }
 
+    /// @dev Function set max mint amount in publicsale per address
+    /// @param _newmaxMintAmount Max mint amount.
     function setmaxMintAmountPublichSalePerAddress(uint256 _newmaxMintAmount)
         public
         onlyOwner
@@ -72,14 +82,20 @@ contract MarketPlace is ERC721Holder, Ownable {
         maxMintAmountPublicPerAddress = _newmaxMintAmount;
     }
 
+    /// @dev Function set presale cost per token
+    /// @param _cost cost.
     function setPreSaleCost(uint256 _cost) public onlyOwner {
         preSaleCost = _cost;
     }
 
+    /// @dev Function set public cost per token
+    /// @param _cost cost.
     function setPublicSaleCost(uint256 _cost) public onlyOwner {
         publicSaleCost = _cost;
     }
 
+    /// @dev Function check current wallet of _user is in whitelist or not
+    /// @param _user user wallet.
     function isAddressWhitelisted(address _user) private view returns (bool) {
         uint256 i = 0;
         while (i < whitelistedAddresses.length) {
@@ -136,7 +152,8 @@ contract MarketPlace is ERC721Holder, Ownable {
         _;
     }
   
-   
+    /// @dev Function buyer buy a token by  _tokenId
+    /// @param _tokenId Id of token
     function buyNFT(uint256 _tokenId) 
         external 
         payable  
@@ -155,7 +172,8 @@ contract MarketPlace is ERC721Holder, Ownable {
             publicSaleCost
         );
     }
-     function transferOwnershipTokens(uint256 _amount) 
+
+    function transferOwnershipTokens(uint256 _amount) 
         private 
     {
         uint256 ownerBalance = IERC721(erc721).balanceOf(address(this));
@@ -170,7 +188,9 @@ contract MarketPlace is ERC721Holder, Ownable {
         getOwner().transfer(msg.value);
     }
 
-     function buyNFTPublicSale(uint256 _amount) 
+    /// @dev Function buyer buy when public sale start
+    /// @param _amount Amount of token buyer want to buy.
+    function buyNFTPublicSale(uint256 _amount) 
         external 
         payable  
         activeContract 
@@ -183,6 +203,8 @@ contract MarketPlace is ERC721Holder, Ownable {
         transferOwnershipTokens(_amount);
     }
 
+    /// @dev Function buyer buy when presale start
+    /// @param _amount Amount of token buyer want to buy.
     function buyNFTPresale(uint256 _amount) 
         external 
         payable  
