@@ -38,13 +38,17 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     function batchMint(uint256 _mintAmount) public onlyOwner {
         _mintLoop(msg.sender, _mintAmount);
     }
-    // transfer all owner token to market contract after mint
-    function batchTransfer(address _receiver)
+    // transfer  owner token to market contract after mint
+    function batchTransfer(address _receiver, uint256 _amount)
         external
         onlyOwner
     {
         uint256 ownerBalance = balanceOf(owner());
-        for (uint256 i = 0; i < ownerBalance; i++) {
+        require(
+            ownerBalance > _amount,
+            "Max supply exceeded!"
+        );
+        for (uint256 i = 0; i < _amount; i++) {
             uint256 tokenId = tokenOfOwnerByIndex(owner(), 0);
             safeTransferFrom(owner(), _receiver, tokenId);
         }

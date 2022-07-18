@@ -20,8 +20,8 @@ contract MarketPlace is ERC721Holder, Ownable {
     uint256 public preSaleCost = 0.04 ether;
     uint256 public publicSaleCost = 0.08 ether;
 
-    uint32 preSaleStartTime;
-    uint32 publicSaleStartTime;
+    uint32 public preSaleStartTime;
+    uint32 public publicSaleStartTime;
 
     event BuyNFT (
         uint256 indexed tokenId,
