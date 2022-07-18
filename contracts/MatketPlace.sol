@@ -13,7 +13,7 @@ interface IDrippyZombies is IERC721Enumerable {
 
 contract MarketPlace is ERC721Holder, Ownable {
     address public erc721;
-    address[] private whitelistedAddresses;
+    mapping(address => bool) public whitelistedAddresses;
     uint256 public maxMintAmountPerTx = 1;
     uint256 public maxMintAmountPreSalePerAddress = 4; // Presale
     uint256 public maxMintAmountPublicPerAddress = 6; // public sale
@@ -37,10 +37,13 @@ contract MarketPlace is ERC721Holder, Ownable {
     }
 
     /// @dev Function set whitelist who can buy token in presale.
-    /// @param _addressArray Array of wallet address who will can buy token in presale.
-    function setWhitelist(address[] calldata _addressArray) public onlyOwner {
-        delete whitelistedAddresses;
-        whitelistedAddresses = _addressArray;
+    /// @param _addresses Array of wallet address who will can buy token in presale.
+    /// @param _status Array of status for each wallet address.
+    function setWhitelist(address[] calldata _addresses, bool[] calldata _status) public onlyOwner {
+        require(_addresses.length == _status.length, "Invalid array address");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            whitelistedAddresses[_addresses[i]] = _status[i];
+        }
     }
 
     /// @dev Function Decide when the presale starts
@@ -94,21 +97,8 @@ contract MarketPlace is ERC721Holder, Ownable {
         publicSaleCost = _cost;
     }
 
-    /// @dev Function check current wallet of _user is in whitelist or not
-    /// @param _user user wallet.
-    function isAddressWhitelisted(address _user) private view returns (bool) {
-        uint256 i = 0;
-        while (i < whitelistedAddresses.length) {
-            if (whitelistedAddresses[i] == _user) {
-                return true;
-            }
-            i++;
-        }
-        return false;
-    }
-
     modifier onWhiteList() {
-        require(isAddressWhitelisted(msg.sender), "Not on the whitelist!");
+        require(whitelistedAddresses[msg.sender] == true, "Not on the whitelist!");
         _;
     }
     modifier maxMintAmount(uint256 _mintAmount, uint256 checkedValue) {
@@ -143,6 +133,15 @@ contract MarketPlace is ERC721Holder, Ownable {
         _;
     }
 
+    modifier saleEndTime(uint256 _endTime) {
+        uint256 _saleEndTime = uint256(_endTime);
+        require(
+            _saleEndTime != 0 && block.timestamp <= _saleEndTime,
+            "sale has end"
+        );
+        _;
+    }
+
     modifier minAmount(uint256 _mintAmount) {
          require(_mintAmount > 0, "Minimum mint per address exceeded!");
         _;
@@ -162,7 +161,7 @@ contract MarketPlace is ERC721Holder, Ownable {
         saleStartTime(publicSaleStartTime)   
         minAmount(1) 
     {
-        getOwner().transfer(msg.value);
+        payable(getOwner()).transfer(msg.value);
         IERC721(erc721).safeTransferFrom(address(this), msg.sender, _tokenId);
         emit BuyNFT (
             _tokenId,
@@ -185,13 +184,13 @@ contract MarketPlace is ERC721Holder, Ownable {
             uint256 tokenId = IDrippyZombies(erc721).tokenOfOwnerByIndex(address(this), 0);
             IERC721(erc721).safeTransferFrom(address(this), msg.sender, tokenId);
         }
-        getOwner().transfer(msg.value);
+        payable(getOwner()).transfer(msg.value);
     }
 
     /// @dev Function buyer buy when public sale start
     /// @param _amount Amount of token buyer want to buy.
     function buyNFTPublicSale(uint256 _amount) 
-        external 
+        public 
         payable  
         activeContract 
         insufficientFunds(publicSaleCost, _amount) 
@@ -206,11 +205,12 @@ contract MarketPlace is ERC721Holder, Ownable {
     /// @dev Function buyer buy when presale start
     /// @param _amount Amount of token buyer want to buy.
     function buyNFTPresale(uint256 _amount) 
-        external 
+        public 
         payable  
         activeContract 
         insufficientFunds(preSaleCost, _amount) 
         saleStartTime(preSaleStartTime)   
+        saleEndTime(publicSaleStartTime)
         minAmount(_amount) 
         mintPerTx(_amount) 
         maxMintAmount(_amount, maxMintAmountPreSalePerAddress) 
@@ -219,11 +219,26 @@ contract MarketPlace is ERC721Holder, Ownable {
         transferOwnershipTokens(_amount);
     }
 
-    function getOwner() public view returns (address payable)  {
-        return payable(owner());
-    }
-
     function getPaused() public view returns (bool)  {
         return IDrippyZombies(erc721).getPaused();
     }
+
+    function withdrawNFT(uint256 _tokenId, address _receiver) external onlyOwner {
+       IERC721(erc721).safeTransferFrom(address(this), _receiver, _tokenId);
+       
+    }
+
+    function withdrawAllNFTs(address _receiver) external onlyOwner {
+        uint256 _amounts = IERC721Enumerable(erc721).balanceOf(address(this));
+        for (uint256 i = 0; i < _amounts; i++) {
+            uint256 _tokenId = IERC721Enumerable(erc721).tokenOfOwnerByIndex(address(this), 0);
+            IERC721(erc721).safeTransferFrom(address(this), _receiver, _tokenId);
+        }
+       
+    }
+     function getOwner() public view returns (address payable)  {
+        return payable(owner());
+    }
+
+
 }

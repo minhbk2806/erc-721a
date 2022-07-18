@@ -51,7 +51,7 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     {
         uint256 ownerBalance = balanceOf(owner());
         require(
-            ownerBalance > _amount,
+            ownerBalance >= _amount,
             "Max supply exceeded!"
         );
         for (uint256 i = 0; i < _amount; i++) {
