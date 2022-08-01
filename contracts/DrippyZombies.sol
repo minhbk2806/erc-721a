@@ -3,11 +3,16 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
 
 pragma solidity >=0.7.0 <0.9.0;
 
-contract DrippyZombies is ERC721Enumerable, Ownable {
+contract DrippyZombies is ERC721, Ownable {
     using Strings for uint256;
+
+    using Counters for Counters.Counter;
+    Counters.Counter private supply;
 
     string public baseURI = "";
     string public uriSuffix = ".json";
@@ -18,8 +23,8 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     uint256 public maxMintAmountPerTx = 5;
     uint256 public maxMintAmountPreSalePerAddress = 4; // Presale
     uint256 public maxMintAmountPublicPerAddress = 6; // public sale
-    uint256 public preSaleCost = 0.04 ether;
-    uint256 public publicSaleCost = 0.08 ether;
+    uint256 public preSaleCost = 0.029 ether;
+    uint256 public publicSaleCost = 0.05 ether;
 
     uint32 public preSaleStartTime;
     uint32 public publicSaleStartTime;
@@ -193,7 +198,7 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
 
     /// @dev Function buyer buy when public sale start
     /// @param _mintAmount Amount of token buyer want to buy.
-    function buyNFTPublicSale(uint256 _mintAmount) 
+    function publicSaleMint(uint256 _mintAmount) 
         public 
         payable  
         activeContract 
@@ -216,8 +221,12 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     {
         uint256 ownerTokenCount = balanceOf(_owner);
         uint256[] memory tokenIds = new uint256[](ownerTokenCount);
+        uint256 currentIndex;
         for (uint256 i; i < ownerTokenCount; i++) {
-            tokenIds[i] = tokenOfOwnerByIndex(_owner, i);
+             if (ownerOf(i) == _owner) {
+                tokenIds[currentIndex++] = uint256(i);
+            }
+            // tokenIds[i] = tokenOfOwnerByIndex(_owner, i);
         }
         return tokenIds;
     }
@@ -284,6 +293,10 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     function getMaxSupply() external view returns (uint256) {
         return maxSupply;
     }
+
+    function totalSupply() public view returns (uint256) {
+        return supply.current();
+    }
   
 
     function withdraw() public onlyOwner {
@@ -296,9 +309,9 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     }
 
     function _mintLoop(address _receiver, uint256 _mintAmount) internal {
-         uint256 supply = totalSupply();
+        uint256 currentSupply = supply.current();
         for (uint256 i = 0; i < _mintAmount; i++) {
-            _safeMint(_receiver, supply + i);
+            _safeMint(_receiver, currentSupply + i);
         }
     }
 
