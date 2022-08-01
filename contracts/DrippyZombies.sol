@@ -13,6 +13,16 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     string public uriSuffix = ".json";
     
     uint256 public maxSupply = 8000;
+
+    mapping(address => bool) public whitelistedAddresses;
+    uint256 public maxMintAmountPerTx = 5;
+    uint256 public maxMintAmountPreSalePerAddress = 4; // Presale
+    uint256 public maxMintAmountPublicPerAddress = 6; // public sale
+    uint256 public preSaleCost = 0.04 ether;
+    uint256 public publicSaleCost = 0.08 ether;
+
+    uint32 public preSaleStartTime;
+    uint32 public publicSaleStartTime;
    
     bool public paused = false;
     bool public revealed = false;
@@ -35,6 +45,117 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         _;
     }
 
+     /// @dev Function set whitelist who can buy token in presale.
+    /// @param _addresses Array of wallet address who will can buy token in presale.
+    /// @param _status Array of status for each wallet address.
+    function setWhitelist(address[] calldata _addresses, bool[] calldata _status) public onlyOwner {
+        require(_addresses.length == _status.length, "Invalid array address");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            whitelistedAddresses[_addresses[i]] = _status[i];
+        }
+    }
+
+    /// @dev Function Decide when the presale starts
+    /// @param timestamp Timestamp start presale.
+    function setPreSaleStartTime(uint32 timestamp) external onlyOwner {
+        preSaleStartTime = timestamp;
+    }
+
+    /// @dev Function Decide when the public starts
+    /// @param timestamp Timestamp start publicsale.
+    function setPublicSaleStartTime(uint32 timestamp) external onlyOwner {
+        publicSaleStartTime = timestamp;
+    }
+
+    /// @dev Function set max mint amount per transaction
+    /// @param _maxMintAmountPerTx Max mint amount.
+    function setMaxMintAmountPerTx(uint256 _maxMintAmountPerTx)
+        public
+        onlyOwner
+    {
+        maxMintAmountPerTx = _maxMintAmountPerTx;
+    }
+
+    /// @dev Function set max mint amount in presale per address
+    /// @param _newmaxMintAmount Max mint amount.
+    function setmaxMintAmountPreSalePerAddress(uint256 _newmaxMintAmount)
+        public
+        onlyOwner
+    {
+        maxMintAmountPreSalePerAddress = _newmaxMintAmount;
+    }
+
+    /// @dev Function set max mint amount in publicsale per address
+    /// @param _newmaxMintAmount Max mint amount.
+    function setmaxMintAmountPublichSalePerAddress(uint256 _newmaxMintAmount)
+        public
+        onlyOwner
+    {
+        maxMintAmountPublicPerAddress = _newmaxMintAmount;
+    }
+
+    /// @dev Function set presale cost per token
+    /// @param _cost cost.
+    function setPreSaleCost(uint256 _cost) public onlyOwner {
+        preSaleCost = _cost;
+    }
+
+    /// @dev Function set public cost per token
+    /// @param _cost cost.
+    function setPublicSaleCost(uint256 _cost) public onlyOwner {
+        publicSaleCost = _cost;
+    }
+
+    modifier onWhiteList() {
+        require(whitelistedAddresses[msg.sender] == true, "Not on the whitelist!");
+        _;
+    }
+    modifier maxMintAmount(uint256 _mintAmount, uint256 checkedValue) {
+        require(
+            balanceOf(msg.sender) + _mintAmount <
+                checkedValue + 1,
+            "Max mint per address exceeded!"
+        );
+        _;
+    }
+    modifier mintPerTx(uint256 _mintAmount) {
+        require(
+            _mintAmount < maxMintAmountPerTx + 1,
+            "Invalid max min amount per transaction!"
+        );
+        _;
+    }
+
+    modifier insufficientFunds(uint256 _tokenPrice, uint256 _mintAmount) {
+        require(msg.value >= _tokenPrice * _mintAmount, "Insufficient funds!");
+        _;
+    }
+
+    modifier saleStartTime(uint256 _startTime) {
+        uint256 _saleStartTime = uint256(_startTime);
+        // It can mint when the pre sale begins.
+        require(
+            _saleStartTime != 0 && block.timestamp >= _saleStartTime,
+            "sale has not started yet"
+        );
+        _;
+    }
+
+    modifier saleEndTime(uint256 _endTime) {
+        uint256 _saleEndTime = uint256(_endTime);
+        require(
+            _saleEndTime != 0 && block.timestamp <= _saleEndTime,
+            "sale has end"
+        );
+        _;
+    }
+
+    modifier minAmount(uint256 _mintAmount) {
+         require(_mintAmount > 0, "Minimum mint per address exceeded!");
+        _;
+    }
+
+
 
     /// @dev Function multi mint.
     /// @param _mintAmount Number of amount NFTs owner want to mint.
@@ -42,23 +163,6 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
         _mintLoop(msg.sender, _mintAmount);
     }
 
-    /// @dev Function transfer owner token to market contract after mint.
-    /// @param _receiver Market contract that receive NFTs from owner.
-    /// @param _amount Number of amount NFTs owner want to transfer to Market contract.
-    function batchTransfer(address _receiver, uint256 _amount)
-        external
-        onlyOwner
-    {
-        uint256 ownerBalance = balanceOf(owner());
-        require(
-            ownerBalance >= _amount,
-            "Max supply exceeded!"
-        );
-        for (uint256 i = 0; i < _amount; i++) {
-            uint256 tokenId = tokenOfOwnerByIndex(owner(), 0);
-            safeTransferFrom(owner(), _receiver, tokenId);
-        }
-    }
 
     /// @dev Function multi mint from special address.
     /// @param _receiver Address wallet that receive NFTs from owner.
@@ -69,6 +173,39 @@ contract DrippyZombies is ERC721Enumerable, Ownable {
     {
         _mintLoop(_receiver, _mintAmount);
     }
+
+    /// @dev Function buyer buy when presale start
+    /// @param _mintAmount Amount of token buyer want to buy.
+    function preSaleMint(uint256 _mintAmount)
+        external
+        payable
+        activeContract 
+        insufficientFunds(preSaleCost, _mintAmount) 
+        saleStartTime(preSaleStartTime)   
+        saleEndTime(publicSaleStartTime)
+        minAmount(_mintAmount) 
+        mintPerTx(_mintAmount) 
+        maxMintAmount(_mintAmount, maxMintAmountPreSalePerAddress) 
+        onWhiteList 
+    {
+        _mintLoop(msg.sender, _mintAmount);
+    }
+
+    /// @dev Function buyer buy when public sale start
+    /// @param _mintAmount Amount of token buyer want to buy.
+    function buyNFTPublicSale(uint256 _mintAmount) 
+        public 
+        payable  
+        activeContract 
+        insufficientFunds(publicSaleCost, _mintAmount) 
+        saleStartTime(publicSaleStartTime)
+        minAmount(_mintAmount) 
+        mintPerTx(_mintAmount) 
+        maxMintAmount(_mintAmount, maxMintAmountPublicPerAddress) 
+    {
+        _mintLoop(msg.sender, _mintAmount);
+    }
+
 
     /// @dev Function check all current tokenId of the _owner address.
     /// @param _owner Address wallet that want to get.
